@@ -2,14 +2,14 @@
   "builds": [
     {
       "src": "app.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb",
-        "excludeFiles": "{llm_project/db.sqlite3,**/__pycache__/**,**/*.pyc}"
-      }
+      "use": "@vercel/python"
     }
   ],
   "rewrites": [
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/app.py"
