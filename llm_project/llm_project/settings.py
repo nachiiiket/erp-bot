@@ -49,8 +49,11 @@ def _env_list(name: str, default: list[str] | None = None) -> list[str]:
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+NVIDIA_API_KEY = os.environ.get('NVIDIA_API_KEY', '')
+NVIDIA_MODEL = os.environ.get('NVIDIA_MODEL', 'nvidia/nemotron-3-ultra-550b-a55b')
+NVIDIA_BASE_URL = os.environ.get('NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1')
+
+APP_AUTH_TOKEN = os.environ.get('APP_AUTH_TOKEN', '')
 
 
 # Quick-start development settings - unsuitable for production

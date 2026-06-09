@@ -1,4 +1,5 @@
 import logging
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -6,6 +7,17 @@ from .agent import run_agent
 from .data_loader import reload_data
 
 logger = logging.getLogger(__name__)
+
+APP_AUTH_TOKEN = getattr(settings, 'APP_AUTH_TOKEN', '')
+
+
+def _check_auth(request):
+    if not APP_AUTH_TOKEN:
+        return None
+    auth = request.headers.get('Authorization', '').strip()
+    if auth.lower().startswith('bearer ') and auth[7:] == APP_AUTH_TOKEN:
+        return None
+    return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
 
 # in-memory session store — replace with Redis/DB for production
 _sessions: dict[str, list] = {}
@@ -26,6 +38,9 @@ class AgentQueryView(APIView):
     """
 
     def post(self, request):
+        err = _check_auth(request)
+        if err:
+            return err
         query = request.data.get('query', '').strip()
         session_id = request.data.get('session_id', '')
 
@@ -66,6 +81,9 @@ class DataReloadView(APIView):
     """
 
     def post(self, request):
+        err = _check_auth(request)
+        if err:
+            return err
         try:
             so, sod, inv = reload_data()
             return Response({
@@ -86,6 +104,9 @@ class SessionClearView(APIView):
     """
 
     def delete(self, request, session_id):
+        err = _check_auth(request)
+        if err:
+            return err
         if session_id in _sessions:
             del _sessions[session_id]
         return Response({'status': 'cleared', 'session_id': session_id})
@@ -95,6 +116,9 @@ class HealthView(APIView):
     """GET /api/health/ — quick sanity check"""
 
     def get(self, request):
+        err = _check_auth(request)
+        if err:
+            return err
         from .data_loader import load_data
         try:
             so, sod, inv = load_data()

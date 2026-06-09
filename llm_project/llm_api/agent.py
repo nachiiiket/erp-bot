@@ -8,7 +8,9 @@ from .analytics_tools import TOOL_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-OPENAI_MODEL = getattr(settings, 'OPENAI_MODEL', 'gpt-4o-mini')
+NVIDIA_API_KEY = getattr(settings, 'NVIDIA_API_KEY', '') or os.environ.get('NVIDIA_API_KEY')
+NVIDIA_MODEL = getattr(settings, 'NVIDIA_MODEL', 'nvidia/nemotron-3-ultra-550b-a55b')
+NVIDIA_BASE_URL = getattr(settings, 'NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1')
 MAX_ITERATIONS = 6
 
 SYSTEM_PROMPT = """You are an expert Sales Analytics AI for Best Marine Private Limited, 
@@ -27,8 +29,6 @@ Rules:
 - Structure answers with: Summary → Key Findings → Recommendations.
 - Use ₹ for currency. Be direct and business-focused.
 - Do not invent data. Only use what the tools return."""
-
-# ── tool definitions ─────────────────────────────────────────────────────────
 
 TOOL_DEFINITIONS = [
     {
@@ -203,122 +203,18 @@ def _tool_call_message(tool_call):
     }
 
 
-# ── agent runner ──────────────────────────────────────────────────────────────
-
-def _legacy_anthropic_run_agent(query: str, conversation_history: list = None, api_key: str = None) -> dict:
-    """
-    Runs the agent loop: sends query → Claude picks tools → tools execute
-    → results fed back → Claude generates final answer.
-
-    Returns:
-        {
-            'answer': str,
-            'tools_used': list[str],
-            'raw_tool_results': dict,
-            'error': str | None,
-        }
-    """
-    api_key = api_key or os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        raise ValueError(
-            'Anthropic API key is missing. Set ANTHROPIC_API_KEY on the server '
-            'or enter your key in the dashboard API config.'
-        )
-
-    client = anthropic.Anthropic(api_key=api_key)
-
-    messages = list(conversation_history or [])
-    messages.append({'role': 'user', 'content': query})
-
-    tools_used = []
-    raw_results = {}
-    iteration = 0
-
-    while iteration < MAX_ITERATIONS:
-        iteration += 1
-
-        response = client.messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            tools=TOOL_DEFINITIONS,
-            messages=messages,
-        )
-
-        # append assistant response to history
-        messages.append({'role': 'assistant', 'content': response.content})
-
-        if response.stop_reason == 'end_turn':
-            # extract final text
-            answer = next(
-                (block.text for block in response.content if hasattr(block, 'text')),
-                'No response generated.'
-            )
-            return {
-                'answer': answer,
-                'tools_used': tools_used,
-                'raw_tool_results': raw_results,
-                'error': None,
-            }
-
-        if response.stop_reason == 'tool_use':
-            tool_results = []
-
-            for block in response.content:
-                if block.type != 'tool_use':
-                    continue
-
-                tool_name = block.name
-                tool_input = block.input
-                tools_used.append(tool_name)
-
-                logger.info(f'Tool call: {tool_name}({tool_input})')
-
-                if tool_name not in TOOL_REGISTRY:
-                    result = {'error': f'Unknown tool: {tool_name}'}
-                else:
-                    try:
-                        result = TOOL_REGISTRY[tool_name](**tool_input)
-                    except Exception as e:
-                        logger.exception(f'Tool {tool_name} failed')
-                        result = {'error': str(e)}
-
-                raw_results[tool_name] = result
-                tool_results.append({
-                    'type': 'tool_result',
-                    'tool_use_id': block.id,
-                    'content': json.dumps(result),
-                })
-
-            messages.append({'role': 'user', 'content': tool_results})
-            continue
-
-        # unexpected stop reason
-        break
-
-    return {
-        'answer': 'Agent reached max iterations without final answer.',
-        'tools_used': tools_used,
-        'raw_tool_results': raw_results,
-        'error': 'max_iterations_reached',
-    }
-
-
 def run_agent(query: str, conversation_history: list = None, api_key: str = None) -> dict:
-    """
-    Runs the agent loop: sends query -> OpenAI picks tools -> tools execute
-    -> results fed back -> OpenAI generates final answer.
-    """
-    api_key = api_key or getattr(settings, 'OPENAI_API_KEY', '') or os.environ.get('OPENAI_API_KEY')
-    if not api_key or api_key == 'your_openai_api_key_here':
+    api_key = api_key or NVIDIA_API_KEY
+    if not api_key or api_key == 'your_nvidia_api_key_here':
         raise ValueError(
-            'OpenAI API key is missing. Add OPENAI_API_KEY to llm_project/.env '
+            'NVIDIA API key is missing. Add NVIDIA_API_KEY to llm_project/.env '
             'and restart the Django server.'
         )
 
     client = OpenAI(
         api_key=api_key,
-        http_client=httpx.Client(trust_env=False, timeout=60.0),
+        base_url=NVIDIA_BASE_URL,
+        http_client=httpx.Client(trust_env=False, timeout=120.0),
     )
 
     messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
@@ -330,11 +226,17 @@ def run_agent(query: str, conversation_history: list = None, api_key: str = None
 
     for _ in range(MAX_ITERATIONS):
         response = client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=NVIDIA_MODEL,
             messages=messages,
             tools=_openai_tools(),
             tool_choice='auto',
-            max_tokens=4096,
+            max_tokens=16384,
+            temperature=1,
+            top_p=0.95,
+            extra_body={
+                "chat_template_kwargs": {"enable_thinking": True},
+                "reasoning_budget": 16384,
+            },
         )
 
         message = response.choices[0].message

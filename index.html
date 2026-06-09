@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BM Sales Intelligence</title>
+<title>ERP AI Analytics</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
 <style>
 /* ── reset & vars ── */
@@ -500,24 +500,19 @@ main {
 </head>
 <body>
 
-<!-- ── API CONFIG MODAL ── -->
-<div class="overlay" id="config-modal">
+<!-- ── AUTH MODAL ── -->
+<div class="overlay" id="auth-modal">
   <div class="modal">
-    <h2>Configure API</h2>
-    <p>Enter your backend URL (Django DRF). The OpenAI key is read by Django from <code>llm_project/.env</code>.</p>
+    <h2>Authentication Required</h2>
+    <p>Enter your access token to connect to the ERP AI Analytics backend.</p>
 
     <div class="field">
-      <label>BACKEND URL</label>
-      <input id="cfg-url" type="text" placeholder="/api" value="/api" />
+      <label>ACCESS TOKEN</label>
+      <input id="auth-token-input" type="password" placeholder="Enter your access token" autocomplete="off" />
     </div>
 
-    <div class="field">
-      <label>SESSION ID</label>
-      <input id="cfg-session" type="text" placeholder="Leave blank to auto-generate" />
-    </div>
-
-    <button class="btn-primary" onclick="saveConfig()">Launch Dashboard →</button>
-    <p class="api-note">Queries go to <code>/api/ask/</code> on your DRF server. <a href="#" onclick="useDemoMode()">Use demo mode</a> to test UI without backend.</p>
+    <button class="btn-primary" onclick="saveAuth()">Connect →</button>
+    <p class="api-note">The token is sent securely with each request. <a href="#" onclick="useDemoMode()">Use demo mode</a> to test UI without backend.</p>
   </div>
 </div>
 
@@ -525,7 +520,7 @@ main {
 <header>
   <div class="logo">
     <div class="logo-dot"></div>
-    BM INTELLIGENCE
+    ERP AI ANALYTICS
   </div>
   <div class="header-meta">
     <div class="status-badge">
@@ -533,7 +528,6 @@ main {
       <span id="status-label">LIVE</span>
     </div>
     <span id="header-session" style="font-size:10px; color: var(--muted)"></span>
-    <button onclick="document.getElementById('config-modal').style.display='flex'" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;">⚙ CONFIG</button>
   </div>
 </header>
 
@@ -621,7 +615,7 @@ main {
   <div id="chat-area">
     <div id="welcome">
       <div style="font-size:40px">📊</div>
-      <div class="welcome-title">Sales Intelligence</div>
+      <div class="welcome-title">ERP AI Analytics</div>
       <div class="welcome-sub">Ask anything about your sales data — customers, products, trends, discontinuations, growth signals, or fulfilment gaps.</div>
       <div class="welcome-chips">
         <div class="chip" onclick="sendQuick('Top 5 customers by revenue')">Top 5 customers</div>
@@ -656,50 +650,35 @@ main {
 
 <script>
 // ── state ──────────────────────────────────────────────────────────────────
-function defaultBackendUrl() {
+let AUTH_TOKEN = '';
+let SESSION_ID = '';
+let DEMO_MODE = false;
+let isLoading = false;
+
+function apiBase() {
   if (location.protocol === 'file:') return 'http://localhost:8000/api';
   return `${location.origin}/api`;
 }
 
-let CFG = { url: defaultBackendUrl(), session: '' };
-let DEMO_MODE = false;
-let isLoading = false;
-
-// ── config ──────────────────────────────────────────────────────────────────
-function saveConfig() {
-  CFG.url     = document.getElementById('cfg-url').value.replace(/\/$/, '');
-  CFG.session = document.getElementById('cfg-session').value.trim() || 'sess-' + Date.now();
-  sessionStorage.setItem('bm-cfg', JSON.stringify(CFG));
-  document.getElementById('config-modal').style.display = 'none';
-  document.getElementById('header-session').textContent = CFG.session;
-  document.getElementById('session-display').textContent = 'SESSION: ' + CFG.session;
+// ── auth ──────────────────────────────────────────────────────────────────
+function saveAuth() {
+  const token = document.getElementById('auth-token-input').value.trim();
+  if (!token) { alert('Please enter your access token.'); return; }
+  AUTH_TOKEN = token;
+  SESSION_ID = 'sess-' + Date.now();
+  document.getElementById('auth-modal').style.display = 'none';
+  document.getElementById('header-session').textContent = SESSION_ID;
+  document.getElementById('session-display').textContent = 'SESSION: ' + SESSION_ID;
 }
 
 function useDemoMode() {
   DEMO_MODE = true;
-  CFG.session = 'demo-' + Date.now();
-  document.getElementById('config-modal').style.display = 'none';
+  SESSION_ID = 'demo-' + Date.now();
+  document.getElementById('auth-modal').style.display = 'none';
   document.getElementById('status-label').textContent = 'DEMO';
-  document.getElementById('header-session').textContent = CFG.session;
-  document.getElementById('session-display').textContent = 'SESSION: ' + CFG.session;
+  document.getElementById('header-session').textContent = SESSION_ID;
+  document.getElementById('session-display').textContent = 'SESSION: ' + SESSION_ID;
 }
-
-// load saved config
-(function() {
-  const saved = sessionStorage.getItem('bm-cfg');
-  if (saved) {
-    try {
-      CFG = JSON.parse(saved);
-      if (location.protocol !== 'file:' && /^https?:\/\/localhost(?::\d+)?\/api$/.test(CFG.url || '')) {
-        CFG.url = defaultBackendUrl();
-      }
-      document.getElementById('cfg-url').value     = CFG.url;
-      document.getElementById('cfg-session').value = CFG.session;
-    } catch(e) {}
-  } else {
-    document.getElementById('cfg-url').value = CFG.url;
-  }
-})();
 
 // ── send ──────────────────────────────────────────────────────────────────
 async function sendQuery() {
@@ -723,17 +702,22 @@ async function sendQuery() {
   const typingId = appendTyping();
 
   try {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + AUTH_TOKEN,
+    };
 
-    const res = await fetch(`${CFG.url}/ask/`, {
+    const res = await fetch(`${apiBase()}/ask/`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ query, session_id: CFG.session }),
+      body: JSON.stringify({ query, session_id: SESSION_ID }),
     });
 
     removeTyping(typingId);
 
-    if (!res.ok) {
+    if (res.status === 401) {
+      appendAiMsg('⚠ **Unauthorized.** Your access token is invalid. Reload the page to re-enter it.', []);
+    } else if (!res.ok) {
       const err = await res.text();
       appendAiMsg(`⚠ Server error ${res.status}: ${err}`, []);
     } else {
@@ -743,8 +727,8 @@ async function sendQuery() {
   } catch(e) {
     removeTyping(typingId);
     appendAiMsg(
-      `⚠ **Connection failed.** Could not reach \`${CFG.url}/ask/\`\n\n` +
-      `Make sure your Django server is running and CORS is enabled.\n\n` +
+      `      ⚠ **Connection failed.** Could not reach \`${apiBase()}/ask/\`\n\n` +
+      `Make sure the backend server is running and CORS is enabled.\n\n` +
       `Error: \`${e.message}\``,
       []
     );
@@ -841,8 +825,11 @@ function clearSession() {
   chat.appendChild(welcome);
 
   // call backend to clear
-  if (!DEMO_MODE && CFG.session) {
-    fetch(`${CFG.url}/session/${CFG.session}/`, { method: 'DELETE' }).catch(() => {});
+  if (!DEMO_MODE && SESSION_ID) {
+    fetch(`${apiBase()}/session/${SESSION_ID}/`, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN },
+    }).catch(() => {});
   }
 }
 
@@ -917,7 +904,7 @@ async function runDemo(query) {
     appendAiMsg(matched.entry.answer(matched.m), matched.entry.tools);
   } else {
     appendAiMsg(
-      `### Demo Mode\n\nI'm running in demo mode without a backend connection.\n\nTry one of these queries:\n- *"Top 5 customers by revenue"*\n- *"Revenue summary"*\n- *"Which products to discontinue?"*\n- *"Show me growth trends"*\n\nConnect your Django backend via ⚙ CONFIG to enable full AI responses.`,
+      `### Demo Mode\n\nI'm running in demo mode without a backend connection.\n\nTry one of these queries:\n- *"Top 5 customers by revenue"*\n- *"Revenue summary"*\n- *"Which products to discontinue?"*\n- *"Show me growth trends"*\n\nConnect your backend to enable full AI responses.`,
       []
     );
   }
