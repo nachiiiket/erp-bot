@@ -15,10 +15,23 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+import os
+from pathlib import Path
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponse
+
+
+def _index_view(request):
+    path = Path(__file__).resolve().parent.parent.parent / "index.html"
+    try:
+        return HttpResponse(path.read_text(encoding="utf-8"), content_type="text/html")
+    except FileNotFoundError:
+        return HttpResponse("index.html not found", status=404)
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("llm_api.urls")),
+    path("", _index_view),
 ]
