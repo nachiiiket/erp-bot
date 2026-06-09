@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app.py": {
+      "excludeFiles": "{llm_project/db.sqlite3,**/__pycache__/**,**/*.pyc}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/app.py"
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": "/app.py"
+    }
+  ]
+}

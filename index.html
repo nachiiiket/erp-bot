@@ -508,7 +508,7 @@ main {
 
     <div class="field">
       <label>BACKEND URL</label>
-      <input id="cfg-url" type="text" placeholder="http://localhost:8000/api" value="http://localhost:8000/api" />
+      <input id="cfg-url" type="text" placeholder="/api" value="/api" />
     </div>
 
     <div class="field">
@@ -656,7 +656,12 @@ main {
 
 <script>
 // ── state ──────────────────────────────────────────────────────────────────
-let CFG = { url: 'http://localhost:8000/api', session: '' };
+function defaultBackendUrl() {
+  if (location.protocol === 'file:') return 'http://localhost:8000/api';
+  return `${location.origin}/api`;
+}
+
+let CFG = { url: defaultBackendUrl(), session: '' };
 let DEMO_MODE = false;
 let isLoading = false;
 
@@ -685,9 +690,14 @@ function useDemoMode() {
   if (saved) {
     try {
       CFG = JSON.parse(saved);
+      if (location.protocol !== 'file:' && /^https?:\/\/localhost(?::\d+)?\/api$/.test(CFG.url || '')) {
+        CFG.url = defaultBackendUrl();
+      }
       document.getElementById('cfg-url').value     = CFG.url;
       document.getElementById('cfg-session').value = CFG.session;
     } catch(e) {}
+  } else {
+    document.getElementById('cfg-url').value = CFG.url;
   }
 })();
 
