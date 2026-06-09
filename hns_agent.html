@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BM Sales Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+/* ── reset & vars ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0c0f;
+  --panel:     #111318;
+  --border:    #1e2229;
+  --accent:    #00e5a0;
+  --accent2:   #ff6b35;
+  --accent3:   #5b8fff;
+  --text:      #e8eaed;
+  --muted:     #6b7280;
+  --font-head: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --radius:    10px;
+  --glow:      0 0 24px rgba(0,229,160,0.15);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: 56px 1fr;
+  grid-template-areas:
+    "header header"
+    "sidebar main";
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ── noise overlay ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0;
+}
+
+/* ── header ── */
+header {
+  grid-area: header;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10,12,15,0.95);
+  backdrop-filter: blur(12px);
+  position: relative; z-index: 10;
+}
+
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-head);
+  font-size: 16px; font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.logo-dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.8); }
+}
+
+.header-meta {
+  display: flex; align-items: center; gap: 16px;
+  font-size: 11px; color: var(--muted);
+}
+
+.status-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0,229,160,0.08);
+  border: 1px solid rgba(0,229,160,0.2);
+  border-radius: 20px;
+  font-size: 10px; color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.status-dot {
+  width: 5px; height: 5px;
+  background: var(--accent); border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+/* ── sidebar ── */
+aside {
+  grid-area: sidebar;
+  border-right: 1px solid var(--border);
+  padding: 20px 16px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative; z-index: 5;
+}
+
+.sidebar-section {
+  font-size: 9px; font-weight: 500;
+  color: var(--muted); letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 12px 8px 6px;
+}
+
+.quick-btn {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  color: #9ca3af;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.quick-btn:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.quick-btn.active {
+  background: rgba(0,229,160,0.06);
+  border-color: rgba(0,229,160,0.25);
+  color: var(--accent);
+}
+
+.quick-btn .icon {
+  display: block; font-size: 10px;
+  color: var(--muted); margin-top: 2px;
+}
+
+/* stats row */
+.sidebar-stats {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px;
+}
+
+.stat-label { color: var(--muted); }
+.stat-val { font-weight: 500; color: var(--accent); }
+
+/* ── main ── */
+main {
+  grid-area: main;
+  display: flex; flex-direction: column;
+  overflow: hidden; position: relative; z-index: 5;
+}
+
+/* ── chat area ── */
+#chat-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+  display: flex; flex-direction: column; gap: 20px;
+  scroll-behavior: smooth;
+}
+
+#chat-area::-webkit-scrollbar { width: 4px; }
+#chat-area::-webkit-scrollbar-track { background: transparent; }
+#chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── welcome ── */
+#welcome {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  flex: 1; gap: 20px; text-align: center;
+  padding: 40px;
+  animation: fadeIn 0.5s ease;
+}
+
+.welcome-title {
+  font-family: var(--font-head);
+  font-size: 36px; font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--text) 40%, var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.welcome-sub {
+  font-size: 13px; color: var(--muted); max-width: 400px; line-height: 1.7;
+}
+
+.welcome-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  max-width: 560px;
+}
+
+.chip {
+  padding: 7px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 11.5px; color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,229,160,0.06);
+}
+
+/* ── messages ── */
+.msg {
+  display: flex; gap: 12px;
+  animation: slideUp 0.25s ease;
+  max-width: 100%;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+
+.msg.user { flex-direction: row-reverse; }
+
+.avatar {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; font-family: var(--font-head);
+  font-weight: 700;
+}
+
+.avatar.ai {
+  background: rgba(0,229,160,0.12);
+  border: 1px solid rgba(0,229,160,0.3);
+  color: var(--accent);
+}
+
+.avatar.user-av {
+  background: rgba(91,143,255,0.12);
+  border: 1px solid rgba(91,143,255,0.3);
+  color: var(--accent3);
+}
+
+.bubble {
+  max-width: 76%;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  font-size: 13px; line-height: 1.75;
+  position: relative;
+}
+
+.msg.user .bubble {
+  background: rgba(91,143,255,0.1);
+  border: 1px solid rgba(91,143,255,0.2);
+  color: var(--text);
+}
+
+.msg.ai .bubble {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.bubble h3 {
+  font-family: var(--font-head); font-size: 13px;
+  color: var(--accent); margin: 12px 0 6px; font-weight: 700;
+}
+.bubble h3:first-child { margin-top: 0; }
+.bubble ul, .bubble ol { padding-left: 18px; margin: 6px 0; }
+.bubble li { margin: 4px 0; }
+.bubble strong { color: var(--accent); font-weight: 500; }
+.bubble em { color: var(--accent2); font-style: normal; font-weight: 500; }
+.bubble code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px; border-radius: 4px;
+  font-size: 11.5px; color: var(--accent3);
+}
+
+/* tool badge row */
+.tool-badges {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.tool-badge {
+  font-size: 10px; padding: 2px 8px;
+  background: rgba(0,229,160,0.06);
+  border: 1px solid rgba(0,229,160,0.15);
+  border-radius: 4px; color: var(--accent);
+}
+
+/* ── typing indicator ── */
+.typing {
+  display: flex; gap: 5px; align-items: center; padding: 14px 18px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); width: fit-content;
+}
+
+.typing span {
+  width: 6px; height: 6px; background: var(--accent);
+  border-radius: 50%; animation: bounce 1.2s infinite;
+}
+
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+  0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+  30%          { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ── tool progress ── */
+.tool-progress {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 11px; color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+  max-width: 76%; margin-left: 44px;
+  animation: fadeIn 0.2s ease;
+}
+
+.tool-progress::before {
+  content: '⚙';
+  color: var(--accent); animation: spin 1.5s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── input bar ── */
+.input-bar {
+  padding: 16px 32px 20px;
+  border-top: 1px solid var(--border);
+  background: rgba(10,12,15,0.9);
+  backdrop-filter: blur(12px);
+}
+
+.input-wrap {
+  display: flex; gap: 10px; align-items: flex-end;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: border-color 0.2s;
+}
+
+.input-wrap:focus-within {
+  border-color: rgba(0,229,160,0.4);
+  box-shadow: var(--glow);
+}
+
+#query-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--font-mono); font-size: 13px;
+  line-height: 1.5; resize: none; min-height: 22px; max-height: 120px;
+}
+
+#query-input::placeholder { color: var(--muted); }
+
+#send-btn {
+  background: var(--accent);
+  color: #000; border: none; border-radius: 8px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  font-size: 16px; transition: all 0.15s;
+}
+
+#send-btn:hover { background: #00ffb2; transform: scale(1.05); }
+#send-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+.input-hint {
+  font-size: 10px; color: var(--muted);
+  margin-top: 8px; padding-left: 2px;
+}
+
+/* ── session controls ── */
+.session-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 32px 12px;
+}
+
+.session-id {
+  font-size: 10px; color: var(--muted);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 8px;
+}
+
+.btn-clear {
+  font-size: 10px; color: var(--muted);
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-mono);
+  transition: color 0.15s;
+}
+.btn-clear:hover { color: var(--accent2); }
+
+/* ── api config modal ── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px; width: 420px; max-width: 95vw;
+  animation: slideUp 0.3s ease;
+}
+
+.modal h2 {
+  font-family: var(--font-head); font-size: 20px; font-weight: 700;
+  margin-bottom: 8px; letter-spacing: -0.02em;
+}
+
+.modal p { font-size: 12px; color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field label { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; }
+
+.field input, .field select {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; color: var(--text);
+  font-family: var(--font-mono); font-size: 13px; outline: none;
+  transition: border-color 0.2s;
+}
+
+.field input:focus, .field select:focus {
+  border-color: rgba(0,229,160,0.4);
+  box-shadow: var(--glow);
+}
+
+.field select option { background: var(--panel); }
+
+.btn-primary {
+  width: 100%; padding: 12px;
+  background: var(--accent); color: #000;
+  border: none; border-radius: 8px;
+  font-family: var(--font-head); font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.15s;
+  margin-top: 4px;
+}
+
+.btn-primary:hover { background: #00ffb2; transform: translateY(-1px); }
+
+.api-note {
+  font-size: 10px; color: var(--muted); text-align: center; margin-top: 12px;
+}
+
+.api-note a { color: var(--accent3); text-decoration: none; }
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── mobile guard ── */
+@media(max-width: 640px) {
+  body { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+  aside { display: none; }
+  #chat-area { padding: 16px; }
+  .input-bar { padding: 12px 16px 16px; }
+  .session-bar { padding: 0 16px 10px; }
+  .bubble { max-width: 90%; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── API CONFIG MODAL ── -->
+<div class="overlay" id="config-modal">
+  <div class="modal">
+    <h2>Configure API</h2>
+    <p>Enter your backend URL (Django DRF). The OpenAI key is read by Django from <code>llm_project/.env</code>.</p>
+
+    <div class="field">
+      <label>BACKEND URL</label>
+      <input id="cfg-url" type="text" placeholder="http://localhost:8000/api" value="http://localhost:8000/api" />
+    </div>
+
+    <div class="field">
+      <label>SESSION ID</label>
+      <input id="cfg-session" type="text" placeholder="Leave blank to auto-generate" />
+    </div>
+
+    <button class="btn-primary" onclick="saveConfig()">Launch Dashboard →</button>
+    <p class="api-note">Queries go to <code>/api/ask/</code> on your DRF server. <a href="#" onclick="useDemoMode()">Use demo mode</a> to test UI without backend.</p>
+  </div>
+</div>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    BM INTELLIGENCE
+  </div>
+  <div class="header-meta">
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      <span id="status-label">LIVE</span>
+    </div>
+    <span id="header-session" style="font-size:10px; color: var(--muted)"></span>
+    <button onclick="document.getElementById('config-modal').style.display='flex'" style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;">⚙ CONFIG</button>
+  </div>
+</header>
+
+<!-- ── SIDEBAR ── -->
+<aside>
+  <div class="sidebar-section">QUICK QUERIES</div>
+
+  <button class="quick-btn" onclick="sendQuick('Give me a complete revenue summary')">
+    Revenue Summary
+    <span class="icon">overall sales, categories, weekly</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Show me the top 10 customers by revenue')">
+    Top 10 Customers
+    <span class="icon">ranked by revenue</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('What are the top 10 products sold by revenue?')">
+    Top 10 Products
+    <span class="icon">ranked by revenue</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Which products and customers should we discontinue and why?')">
+    Discontinuation Advice
+    <span class="icon">with detailed reasoning</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Show me all growing customers and products with trend direction')">
+    Growth Trends
+    <span class="icon">growing vs declining</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Where is volume growth happening? Which customers grew the most?')">
+    Volume Growth Alerts
+    <span class="icon">first-half vs second-half</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Show me slow moving and low volume products')">
+    Low Volume / Dead Stock
+    <span class="icon">slow-moving SKUs</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Analyze order to invoice gaps — which customers have unfulfilled orders?')">
+    Order-Invoice Gap
+    <span class="icon">fulfilment analysis</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Give me the health scores for all customers')">
+    Customer Health Scores
+    <span class="icon">scored 0-100</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Analyze payment behavior — any delays or part payments?')">
+    Payment Behavior
+    <span class="icon">delays, installments</span>
+  </button>
+
+  <button class="quick-btn" onclick="sendQuick('Are there any sales returns or return-related issues?')">
+    Returns Analysis
+    <span class="icon">return rates, reasons</span>
+  </button>
+
+  <div class="sidebar-stats">
+    <div class="stat-row">
+      <span class="stat-label">DATA PERIOD</span>
+      <span class="stat-val">Apr–May '26</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">CUSTOMERS</span>
+      <span class="stat-val">33</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">PRODUCTS</span>
+      <span class="stat-val">182</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">INVOICED</span>
+      <span class="stat-val">₹1.04Cr</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main>
+  <div id="chat-area">
+    <div id="welcome">
+      <div style="font-size:40px">📊</div>
+      <div class="welcome-title">Sales Intelligence</div>
+      <div class="welcome-sub">Ask anything about your sales data — customers, products, trends, discontinuations, growth signals, or fulfilment gaps.</div>
+      <div class="welcome-chips">
+        <div class="chip" onclick="sendQuick('Top 5 customers by revenue')">Top 5 customers</div>
+        <div class="chip" onclick="sendQuick('Which products are declining?')">Declining products</div>
+        <div class="chip" onclick="sendQuick('Who should we discontinue?')">Discontinuation?</div>
+        <div class="chip" onclick="sendQuick('Where is growth happening?')">Growth signals</div>
+        <div class="chip" onclick="sendQuick('Give me a revenue summary')">Revenue overview</div>
+        <div class="chip" onclick="sendQuick('Deep dive on V.Ships India')">V.Ships deep dive</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="session-bar">
+    <span class="session-id" id="session-display"></span>
+    <button class="btn-clear" onclick="clearSession()">✕ clear session</button>
+  </div>
+
+  <div class="input-bar">
+    <div class="input-wrap">
+      <textarea
+        id="query-input"
+        placeholder="Ask about customers, products, trends, growth, discontinuation..."
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button id="send-btn" onclick="sendQuery()" title="Send (Enter)">↑</button>
+    </div>
+    <div class="input-hint">Enter to send · Shift+Enter for new line</div>
+  </div>
+</main>
+
+<script>
+// ── state ──────────────────────────────────────────────────────────────────
+let CFG = { url: 'http://localhost:8000/api', session: '' };
+let DEMO_MODE = false;
+let isLoading = false;
+
+// ── config ──────────────────────────────────────────────────────────────────
+function saveConfig() {
+  CFG.url     = document.getElementById('cfg-url').value.replace(/\/$/, '');
+  CFG.session = document.getElementById('cfg-session').value.trim() || 'sess-' + Date.now();
+  sessionStorage.setItem('bm-cfg', JSON.stringify(CFG));
+  document.getElementById('config-modal').style.display = 'none';
+  document.getElementById('header-session').textContent = CFG.session;
+  document.getElementById('session-display').textContent = 'SESSION: ' + CFG.session;
+}
+
+function useDemoMode() {
+  DEMO_MODE = true;
+  CFG.session = 'demo-' + Date.now();
+  document.getElementById('config-modal').style.display = 'none';
+  document.getElementById('status-label').textContent = 'DEMO';
+  document.getElementById('header-session').textContent = CFG.session;
+  document.getElementById('session-display').textContent = 'SESSION: ' + CFG.session;
+}
+
+// load saved config
+(function() {
+  const saved = sessionStorage.getItem('bm-cfg');
+  if (saved) {
+    try {
+      CFG = JSON.parse(saved);
+      document.getElementById('cfg-url').value     = CFG.url;
+      document.getElementById('cfg-session').value = CFG.session;
+    } catch(e) {}
+  }
+})();
+
+// ── send ──────────────────────────────────────────────────────────────────
+async function sendQuery() {
+  const input = document.getElementById('query-input');
+  const query = input.value.trim();
+  if (!query || isLoading) return;
+
+  hideWelcome();
+  appendUserMsg(query);
+  input.value = '';
+  autoResize(input);
+
+  if (DEMO_MODE) {
+    await runDemo(query);
+    return;
+  }
+
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const typingId = appendTyping();
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+
+    const res = await fetch(`${CFG.url}/ask/`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query, session_id: CFG.session }),
+    });
+
+    removeTyping(typingId);
+
+    if (!res.ok) {
+      const err = await res.text();
+      appendAiMsg(`⚠ Server error ${res.status}: ${err}`, []);
+    } else {
+      const data = await res.json();
+      appendAiMsg(data.answer || 'No response.', data.tools_used || []);
+    }
+  } catch(e) {
+    removeTyping(typingId);
+    appendAiMsg(
+      `⚠ **Connection failed.** Could not reach \`${CFG.url}/ask/\`\n\n` +
+      `Make sure your Django server is running and CORS is enabled.\n\n` +
+      `Error: \`${e.message}\``,
+      []
+    );
+  }
+
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+function sendQuick(q) {
+  document.getElementById('query-input').value = q;
+  sendQuery();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ── dom helpers ──────────────────────────────────────────────────────────────
+function hideWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function appendUserMsg(text) {
+  const chat = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.innerHTML = `
+    <div class="avatar user-av">U</div>
+    <div class="bubble">${escapeHtml(text)}</div>
+  `;
+  chat.appendChild(div);
+  scrollBottom();
+}
+
+function appendAiMsg(text, tools) {
+  const chat = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+
+  const toolHtml = tools.length
+    ? `<div class="tool-badges">${tools.map(t => `<span class="tool-badge">⚙ ${t}</span>`).join('')}</div>`
+    : '';
+
+  div.innerHTML = `
+    <div class="avatar ai">AI</div>
+    <div class="bubble">${markdownToHtml(text)}${toolHtml}</div>
+  `;
+  chat.appendChild(div);
+  scrollBottom();
+}
+
+let typingCount = 0;
+function appendTyping() {
+  const id = 'typing-' + (++typingCount);
+  const chat = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.id = id; div.className = 'msg ai';
+  div.innerHTML = `
+    <div class="avatar ai">AI</div>
+    <div class="typing"><span></span><span></span><span></span></div>
+  `;
+  chat.appendChild(div);
+  scrollBottom();
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function scrollBottom() {
+  const chat = document.getElementById('chat-area');
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function clearSession() {
+  const chat = document.getElementById('chat-area');
+  chat.innerHTML = '';
+  const welcome = document.createElement('div');
+  welcome.id = 'welcome';
+  welcome.innerHTML = `
+    <div style="font-size:40px">📊</div>
+    <div class="welcome-title">Session Cleared</div>
+    <div class="welcome-sub">Start a new query below.</div>
+  `;
+  chat.appendChild(welcome);
+
+  // call backend to clear
+  if (!DEMO_MODE && CFG.session) {
+    fetch(`${CFG.url}/session/${CFG.session}/`, { method: 'DELETE' }).catch(() => {});
+  }
+}
+
+// ── markdown → html (minimal) ─────────────────────────────────────────────
+function markdownToHtml(md) {
+  return md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br/>')
+    .replace(/^(?!<[hup]|<li)(.+)$/gm, '$1');
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── demo mode ────────────────────────────────────────────────────────────────
+const DEMO_ANSWERS = {
+  default: [
+    {
+      match: /top\s*(\d+)\s*customer/i,
+      tools: ['get_top_n'],
+      answer: (m) => `### Top ${m[1]} Customers by Revenue\n\n**Summary:** Best Marine Exports dominates with 47.5% revenue share.\n\n**Key Findings:**\n- **Best Marine Exports** — ₹49,42,870 (47.5%)\n- **Executive Ship Management** — ₹10,82,970 (10.4%)\n- **Mas Workwear** — ₹8,84,040 (8.5%)\n- **MSC Shipmanagement Cyprus** — ₹5,68,635 (5.5%)\n- **V.Ships India** — ₹5,42,267 (5.2%)\n\n**Recommendation:** Top 3 customers = 66% of revenue — high concentration risk. Actively develop mid-tier customers.`,
+    },
+    {
+      match: /revenue summary|overall/i,
+      tools: ['get_revenue_summary'],
+      answer: () => `### Revenue Summary — Apr 2026\n\n**Total Invoiced:** ₹1,04,08,405\n**Total SO Value:** ₹51,06,918\n**Avg Order Value:** ₹17,063\n**Unique Customers:** 33 | **Products:** 182\n\n**Weekly Breakdown:**\n- Week 14: ₹9,72,988\n- *Week 15: ₹69,88,993 ← Peak*\n- Week 16: ₹24,35,550\n- Week 18: ₹10,874 (declining)\n\n**Top Categories:**\n- *Boilersuit* — 43.8%\n- *Parka* — 13.6%\n- *Safety Shoes* — 8.4%\n\n**Recommendation:** Week 15 spike warrants investigation — bulk order? Ensure similar opportunities are captured proactively.`,
+    },
+    {
+      match: /discontinu/i,
+      tools: ['get_discontinuation_candidates'],
+      answer: () => `### Discontinuation Candidates\n\n**13 products** flagged for review.\n\n**Top Candidates:**\n- **Woven Belt-Black** — ₹270 revenue, 1 order only. Holding adds inventory cost with negligible return.\n- **Bags-Carry-Suntech-N.Blue** — ₹492, 1 order. No repeat demand observed.\n- **Bags-Carry-Dynacom-N.Blue** — ₹440, 2 orders. Last active Week 14, no recent activity.\n- **TShirt-Polo Neck-Delos** — ₹116 revenue, dead after first order.\n\n**Recommendation:** Discontinue these 4 immediately. Review remaining 9 in 30 days if no new orders arrive.`,
+    },
+    {
+      match: /trend|growing|declining/i,
+      tools: ['get_trend_direction'],
+      answer: () => `### Trend Analysis\n\n**10 Growing** entities | **13 Declining** entities\n\n**Growing — Increase Focus:**\n- *Goodwood Shipmanagement* — +333% revenue growth\n- *OCS Services DMCC* — +152% growth\n- *Shane Marine Services* — +104% growth\n- *Eastaway India* — new customer, strong second-half activity\n\n**Declining — Investigate:**\n- *Apeejay Shipping* — active week 15 only, silent since\n- *Bernhard Schulte* — dropped after single invoice\n- *Arudra Engineers* — minimal activity throughout\n\n**Recommendation:** Assign dedicated account manager to Goodwood + OCS immediately. Schedule check-in calls with declining customers this week.`,
+    },
+    {
+      match: /growth|volume growth/i,
+      tools: ['get_volume_growth_alerts'],
+      answer: () => `### Volume Growth Alerts\n\n**12 customers** showed significant growth (>20%) from first to second half.\n\n**Top Growers:**\n- *Goodwood Shipmanagement* — ₹3,446 → ₹14,934 (+333%)\n- *OCS Services DMCC* — ₹21,116 → ₹53,373 (+152%)\n- *Shane Marine Services* — ₹9,280 → ₹18,960 (+104%)\n- *Columbia Aurus* — ₹14,013 → ₹19,295 (+37%)\n\n**Recommendation:** Pre-stock top SKUs for Goodwood and OCS. These are high-potential accounts — priority for relationship investment.`,
+    },
+  ],
+};
+
+async function runDemo(query) {
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  const typingId = appendTyping();
+
+  await new Promise(r => setTimeout(r, 1400 + Math.random() * 800));
+  removeTyping(typingId);
+
+  let matched = null;
+  for (const entry of DEMO_ANSWERS.default) {
+    const m = query.match(entry.match);
+    if (m) { matched = { entry, m }; break; }
+  }
+
+  if (matched) {
+    appendAiMsg(matched.entry.answer(matched.m), matched.entry.tools);
+  } else {
+    appendAiMsg(
+      `### Demo Mode\n\nI'm running in demo mode without a backend connection.\n\nTry one of these queries:\n- *"Top 5 customers by revenue"*\n- *"Revenue summary"*\n- *"Which products to discontinue?"*\n- *"Show me growth trends"*\n\nConnect your Django backend via ⚙ CONFIG to enable full AI responses.`,
+      []
+    );
+  }
+
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+}
+</script>
+</body>
+</html>

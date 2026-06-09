@@ -149,6 +149,8 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -208,6 +210,13 @@ tempCodeRunnerFile.py
 
 # PyPI configuration file
 .pypirc
+
+# Vercel local project metadata
+.vercel/
+
+# Private ERP/business data. Store/upload this intentionally, not by accident.
+llm_project/llm_api/data/*.xlsx
+llm_project/llm_api/data/*.xls
 
 # Marimo
 marimo/_static/
