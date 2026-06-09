@@ -1,10 +1,14 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "app.py": {
-      "excludeFiles": "{llm_project/db.sqlite3,**/__pycache__/**,**/*.pyc}"
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "excludeFiles": "{llm_project/db.sqlite3,**/__pycache__/**,**/*.pyc}"
+      }
     }
-  },
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
