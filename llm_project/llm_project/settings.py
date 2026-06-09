@@ -62,7 +62,7 @@ DEBUG = _env_bool('DEBUG', False)
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
-    if DEBUG:
+    if DEBUG or os.environ.get('VERCEL') or os.environ.get('CI'):
         SECRET_KEY = 'django-insecure-local-dev-only-change-me'
     else:
         raise RuntimeError('DJANGO_SECRET_KEY is required when DEBUG is false.')
@@ -168,6 +168,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
