@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 NVIDIA_API_KEY = getattr(settings, 'NVIDIA_API_KEY', '') or os.environ.get('NVIDIA_API_KEY')
 NVIDIA_MODEL = getattr(settings, 'NVIDIA_MODEL', 'nvidia/nemotron-3-ultra-550b-a55b')
 NVIDIA_BASE_URL = getattr(settings, 'NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1')
+
+OPENAI_API_KEY = getattr(settings, 'OPENAI_API_KEY', '') or os.environ.get('OPENAI_API_KEY')
+OPENAI_MODEL = getattr(settings, 'OPENAI_MODEL', 'gpt-4o-mini')
+
 MAX_ITERATIONS = 6
 
 SYSTEM_PROMPT = """You are an expert Sales Analytics AI for Best Marine Private Limited, 
@@ -203,19 +207,29 @@ def _tool_call_message(tool_call):
     }
 
 
-def run_agent(query: str, conversation_history: list = None, api_key: str = None) -> dict:
-    api_key = api_key or NVIDIA_API_KEY
-    if not api_key or api_key == 'your_nvidia_api_key_here':
-        raise ValueError(
-            'NVIDIA API key is missing. Add NVIDIA_API_KEY to llm_project/.env '
-            'and restart the Django server.'
-        )
+def _build_client(provider: str):
+    if provider == 'openai':
+        if not OPENAI_API_KEY:
+            raise ValueError('OpenAI API key is missing. Set OPENAI_API_KEY in .env.')
+        return OpenAI(
+            api_key=OPENAI_API_KEY,
+            http_client=httpx.Client(trust_env=False, timeout=120.0),
+        ), OPENAI_MODEL, {}
+    else:
+        if not NVIDIA_API_KEY:
+            raise ValueError('NVIDIA API key is missing. Set NVIDIA_API_KEY in .env.')
+        return OpenAI(
+            api_key=NVIDIA_API_KEY,
+            base_url=NVIDIA_BASE_URL,
+            http_client=httpx.Client(trust_env=False, timeout=120.0),
+        ), NVIDIA_MODEL, {
+            "chat_template_kwargs": {"enable_thinking": True},
+            "reasoning_budget": 16384,
+        }
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url=NVIDIA_BASE_URL,
-        http_client=httpx.Client(trust_env=False, timeout=120.0),
-    )
+
+def run_agent(query: str, conversation_history: list = None, provider: str = 'nvidia') -> dict:
+    client, model, extra = _build_client(provider)
 
     messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
     messages.extend(conversation_history or [])
@@ -224,20 +238,20 @@ def run_agent(query: str, conversation_history: list = None, api_key: str = None
     tools_used = []
     raw_results = {}
 
+    kwargs: dict = {
+        'model': model,
+        'messages': messages,
+        'tools': _openai_tools(),
+        'tool_choice': 'auto',
+        'max_tokens': 16384,
+        'temperature': 1,
+        'top_p': 0.95,
+    }
+    if extra:
+        kwargs['extra_body'] = extra
+
     for _ in range(MAX_ITERATIONS):
-        response = client.chat.completions.create(
-            model=NVIDIA_MODEL,
-            messages=messages,
-            tools=_openai_tools(),
-            tool_choice='auto',
-            max_tokens=16384,
-            temperature=1,
-            top_p=0.95,
-            extra_body={
-                "chat_template_kwargs": {"enable_thinking": True},
-                "reasoning_budget": 16384,
-            },
-        )
+        response = client.chat.completions.create(**kwargs)
 
         message = response.choices[0].message
         tool_calls = message.tool_calls or []

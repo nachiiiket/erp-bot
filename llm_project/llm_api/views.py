@@ -8,16 +8,24 @@ from .data_loader import reload_data
 
 logger = logging.getLogger(__name__)
 
-APP_AUTH_TOKEN = getattr(settings, 'APP_AUTH_TOKEN', '')
+OPENAI_AUTH_TOKEN = getattr(settings, 'OPENAI_AUTH_TOKEN', '')
+NVIDIA_AUTH_TOKEN = getattr(settings, 'NVIDIA_AUTH_TOKEN', '')
 
 
 def _check_auth(request):
-    if not APP_AUTH_TOKEN:
-        return None
+    """Check Authorization header against both tokens. Returns (error_response | None, provider | None)."""
     auth = request.headers.get('Authorization', '').strip()
-    if auth.lower().startswith('bearer ') and auth[7:] == APP_AUTH_TOKEN:
-        return None
-    return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+    if not auth.lower().startswith('bearer '):
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED), None
+
+    token = auth[7:]
+
+    if OPENAI_AUTH_TOKEN and token == OPENAI_AUTH_TOKEN:
+        return None, 'openai'
+    if NVIDIA_AUTH_TOKEN and token == NVIDIA_AUTH_TOKEN:
+        return None, 'nvidia'
+
+    return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED), None
 
 # in-memory session store — replace with Redis/DB for production
 _sessions: dict[str, list] = {}
@@ -38,7 +46,7 @@ class AgentQueryView(APIView):
     """
 
     def post(self, request):
-        err = _check_auth(request)
+        err, provider = _check_auth(request)
         if err:
             return err
         query = request.data.get('query', '').strip()
@@ -50,7 +58,7 @@ class AgentQueryView(APIView):
         history = _sessions.get(session_id, []) if session_id else []
 
         try:
-            result = run_agent(query, conversation_history=history)
+            result = run_agent(query, conversation_history=history, provider=provider)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -81,7 +89,7 @@ class DataReloadView(APIView):
     """
 
     def post(self, request):
-        err = _check_auth(request)
+        err, _provider = _check_auth(request)
         if err:
             return err
         try:
@@ -104,7 +112,7 @@ class SessionClearView(APIView):
     """
 
     def delete(self, request, session_id):
-        err = _check_auth(request)
+        err, _provider = _check_auth(request)
         if err:
             return err
         if session_id in _sessions:
@@ -116,7 +124,7 @@ class HealthView(APIView):
     """GET /api/health/ — quick sanity check"""
 
     def get(self, request):
-        err = _check_auth(request)
+        err, _provider = _check_auth(request)
         if err:
             return err
         from .data_loader import load_data
