@@ -2,7 +2,7 @@
 
 AI-powered sales intelligence chatbot for Best Marine Private Limited. Analyzes ERP sales data (Sales Orders, Invoices) and answers business queries using an LLM agent with tool-calling.
 
-**Live demo:** [https://erp-bot-ebon.vercel.app/](https://erp-bot-ebon.vercel.app/)
+**Live demo:** [https://erp-2w694uaqf-erp-bot-demo.vercel.app/](https://erp-2w694uaqf-erp-bot-demo.vercel.app/)
 
 ## Stack
 
@@ -42,7 +42,7 @@ Open `http://localhost:8000` – the Django view serves the frontend. Enter your
 
 The frontend pops up asking for an **access token**.
 
-> **Trial access:** Use `nv-token-2026` to try the app. No separate API key needed on your side.
+> **Trial access:** Use `nv-token-2603` to try the app. No separate API key needed on your side.
 
 ## API Endpoints
 
